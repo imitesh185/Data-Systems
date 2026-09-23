@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/imitesh185/sparknerve/sparknerve/pipeline.schema.json",
+  "$id": "https://raw.githubusercontent.com/imitesh185/Data-Systems/main/SparkNerve/sparknerve/pipeline.schema.json",
   "title": "SparkNerve pipeline metadata",
   "description": "One file per source system. Every table listed here becomes an extract task and a validate task in a generated Airflow DAG.",
   "type": "object",

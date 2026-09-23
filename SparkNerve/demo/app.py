@@ -28,7 +28,7 @@ from sparknerve.metadata import load_pipelines  # noqa: E402
 from sparknerve.planner import cli_command  # noqa: E402
 from sparknerve.rules import compile_rules  # noqa: E402
 
-REPO_URL = "https://github.com/imitesh185/sparknerve"
+REPO_URL = "https://github.com/imitesh185/Data-Systems/tree/main/SparkNerve"
 PIPELINE = "retail_sales"
 TABLES = ("customers", "products", "orders")
 CHAOS = {

@@ -9,6 +9,7 @@ import streamlit as st
 from deltasync.engine import DemoEngine
 
 ROOT = Path(__file__).resolve().parent
+REPO_URL = "https://github.com/imitesh185/Data-Systems/tree/main/DeltaSync"
 
 st.set_page_config(
     page_title="DeltaSync - CDC to Delta Lake",
@@ -68,6 +69,8 @@ with st.sidebar:
     if st.button("↺ Reset demo", use_container_width=True):
         demo.reset()
         st.rerun()
+    st.divider()
+    st.caption(f"[Source code]({REPO_URL})")
 
 st.title("🔁 DeltaSync")
 st.markdown(
@@ -192,4 +195,3 @@ Use **Replay last batch** after a successful batch. The row count and values rem
 unchanged, demonstrating the same idempotent contract used by the Spark job.
 """
     )
-
