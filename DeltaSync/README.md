@@ -76,7 +76,7 @@ starting the infrastructure stack.
 
 ### 1. Open the project
 
-From the NuSummit repository:
+From the Data-Systems repository:
 
 ```bash
 cd DeltaSync
