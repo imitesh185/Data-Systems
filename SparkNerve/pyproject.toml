@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sparknerve"
+version = "1.0.0"
+description = "Metadata-driven ingestion platform: SQL Server -> Airflow -> Spark -> Data Quality -> Delta Lake, observed with Prometheus"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Mitesh Shah" }]
+dependencies = [
+    "jsonschema>=4.21",
+    "prometheus-client>=0.20",
+]
+
+[project.optional-dependencies]
+spark = ["pyspark==3.5.3", "delta-spark==3.2.1"]
+sqlserver = ["pymssql>=2.3"]
+demo = [
+    "streamlit==1.64.0",
+    "deltalake==1.6.3",
+    "duckdb==1.5.5",
+    "pyarrow==25.0.1",
+    "pandas==3.0.5",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+    "sparknerve[demo]",
+]
+
+[tool.setuptools.packages.find]
+include = ["sparknerve*", "simulator*"]
+
+[tool.setuptools.package-data]
+sparknerve = ["pipeline.schema.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "spark: needs Java 17 and pyspark (runs in CI)",
+    "airflow: needs apache-airflow installed (runs in CI)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

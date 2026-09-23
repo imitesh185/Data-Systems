@@ -1,0 +1,81 @@
+{
+  "$schema": "../../sparknerve/pipeline.schema.json",
+  "pipeline": "retail_sales",
+  "description": "RetailDB (SQL Server) sales tables into the Delta lakehouse: bronze (raw), silver (validated), quarantine (rejected).",
+  "owner": "data-platform",
+  "schedule": "*/10 * * * *",
+  "source": {
+    "type": "sqlserver",
+    "connection": "retaildb",
+    "fetch_size": 10000
+  },
+  "defaults": {
+    "schema_evolution": "add_new_columns",
+    "quarantine_threshold": 0.3,
+    "gate_min_rows": 20,
+    "read_partitions": 1
+  },
+  "tables": [
+    {
+      "name": "customers",
+      "description": "One row per customer.",
+      "source_table": "sales.customers",
+      "primary_key": ["customer_id"],
+      "watermark_column": "modified_at",
+      "rules": [
+        {"name": "email_present", "type": "not_null", "column": "email"},
+        {
+          "name": "email_format",
+          "type": "regex",
+          "column": "email",
+          "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+          "description": "Syntactically valid email address."
+        },
+        {"name": "country_is_iso2", "type": "length", "column": "country_code", "min": 2, "max": 2},
+        {"name": "signup_not_in_future", "type": "not_future", "column": "signup_date", "severity": "warn"}
+      ]
+    },
+    {
+      "name": "products",
+      "description": "Product catalogue.",
+      "source_table": "sales.products",
+      "primary_key": ["product_id"],
+      "watermark_column": "modified_at",
+      "schema_evolution": "fail",
+      "rules": [
+        {"name": "sku_format", "type": "regex", "column": "sku", "pattern": "^SKU-[0-9]{5}$"},
+        {"name": "price_positive", "type": "range", "column": "unit_price", "min": 0.01, "max": 100000},
+        {
+          "name": "category_known",
+          "type": "allowed_values",
+          "column": "category",
+          "values": ["Electronics", "Home", "Apparel", "Books", "Grocery", "Sports"]
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "Orders with one product line each.",
+      "source_table": "sales.orders",
+      "primary_key": ["order_id"],
+      "watermark_column": "modified_at",
+      "partition_by": "order_date",
+      "read_partitions": 4,
+      "rules": [
+        {"name": "customer_present", "type": "not_null", "column": "customer_id"},
+        {"name": "customer_exists", "type": "foreign_key", "column": "customer_id", "references": {"table": "customers", "column": "customer_id"}},
+        {"name": "product_exists", "type": "foreign_key", "column": "product_id", "references": {"table": "products", "column": "product_id"}},
+        {"name": "quantity_valid", "type": "range", "column": "quantity", "min": 1, "max": 1000},
+        {"name": "amount_non_negative", "type": "range", "column": "amount", "min": 0},
+        {
+          "name": "status_known",
+          "type": "allowed_values",
+          "column": "status",
+          "values": ["PLACED", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"]
+        },
+        {"name": "order_date_not_in_future", "type": "not_future", "column": "order_date"},
+        {"name": "delivered_after_ordered", "type": "compare", "column": "delivered_date", "operator": ">=", "other_column": "order_date", "severity": "warn"}
+      ]
+    }
+  ]
+}

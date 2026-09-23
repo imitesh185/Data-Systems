@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/imitesh185/sparknerve/sparknerve/pipeline.schema.json",
+  "title": "SparkNerve pipeline metadata",
+  "description": "One file per source system. Every table listed here becomes an extract task and a validate task in a generated Airflow DAG.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pipeline", "source", "tables"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "pipeline": {"$ref": "#/$defs/identifier"},
+    "description": {"type": "string"},
+    "owner": {"type": "string"},
+    "schedule": {
+      "description": "Cron expression or Airflow preset for the generated DAG; null means manual runs only.",
+      "type": ["string", "null"]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "connection"],
+      "properties": {
+        "type": {"const": "sqlserver"},
+        "connection": {
+          "description": "Connection name; credentials come from SPARKNERVE_CONN_<NAME>_URL/_USER/_PASSWORD.",
+          "$ref": "#/$defs/identifier"
+        },
+        "fetch_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "defaults": {"$ref": "#/$defs/tableSettings"},
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/table"}
+    }
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "column": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+    "tableSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_evolution": {
+          "description": "add_new_columns: new source columns are added to the lake tables. fail: any schema change stops the table.",
+          "enum": ["add_new_columns", "fail"]
+        },
+        "quarantine_threshold": {
+          "description": "Circuit breaker: fail the batch (and keep silver untouched) when more than this share of rows is invalid.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "gate_min_rows": {
+          "description": "The circuit breaker only judges batches with at least this many rows, so a few bad rows in a tiny batch cannot trip it.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "read_partitions": {
+          "description": "Parallel JDBC reads, split on the first primary key column.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source_table", "primary_key", "watermark_column"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "description": {"type": "string"},
+        "source_table": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$"},
+        "primary_key": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/column"}},
+        "watermark_column": {
+          "description": "datetime2 column that increases on every insert/update; drives incremental extraction.",
+          "$ref": "#/$defs/column"
+        },
+        "partition_by": {
+          "description": "Partition column of the silver table. Must never change for a key (e.g. an order date).",
+          "$ref": "#/$defs/column"
+        },
+        "schema_evolution": {"enum": ["add_new_columns", "fail"]},
+        "quarantine_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+        "gate_min_rows": {"type": "integer", "minimum": 0},
+        "read_partitions": {"type": "integer", "minimum": 1, "maximum": 64},
+        "rules": {"type": "array", "items": {"$ref": "#/$defs/rule"}}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["name", "type", "column"],
+      "properties": {
+        "name": {"$ref": "#/$defs/identifier"},
+        "type": {"enum": ["not_null", "range", "allowed_values", "regex", "length", "not_future", "compare", "foreign_key"]},
+        "column": {"$ref": "#/$defs/column"},
+        "severity": {
+          "description": "error: the row is quarantined. warn: the row continues and the warning is recorded on it.",
+          "enum": ["error", "warn"]
+        },
+        "description": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "not_null"}}},
+          "then": {"properties": {"name": true, "type": true, "column": true, "severity": true, "description": true}, "additionalProperties": false}
+        },
+        {
+          "if": {"properties": {"type": {"const": "not_future"}}},
+          "then": {"properties": {"name": true, "type": true, "column": true, "severity": true, "description": true}, "additionalProperties": false}
+        },
+        {
+          "if": {"properties": {"type": {"const": "range"}}},
+          "then": {
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "min": {"type": "number"},
+              "max": {"type": "number"}
+            },
+            "anyOf": [{"required": ["min"]}, {"required": ["max"]}],
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "length"}}},
+          "then": {
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "min": {"type": "integer", "minimum": 0},
+              "max": {"type": "integer", "minimum": 0}
+            },
+            "anyOf": [{"required": ["min"]}, {"required": ["max"]}],
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "allowed_values"}}},
+          "then": {
+            "required": ["values"],
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "values": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": ["string", "number"]}}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "regex"}}},
+          "then": {
+            "required": ["pattern"],
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "pattern": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "compare"}}},
+          "then": {
+            "required": ["operator", "other_column"],
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "operator": {"enum": ["<", "<=", ">", ">=", "=", "!="]},
+              "other_column": {"$ref": "#/$defs/column"}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "foreign_key"}}},
+          "then": {
+            "required": ["references"],
+            "properties": {
+              "name": true, "type": true, "column": true, "severity": true, "description": true,
+              "references": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["table", "column"],
+                "properties": {
+                  "table": {"$ref": "#/$defs/identifier"},
+                  "column": {"$ref": "#/$defs/column"}
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  }
+}
