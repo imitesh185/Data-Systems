@@ -1,0 +1,22 @@
+{
+  "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+  "database.hostname": "mysql",
+  "database.port": "3306",
+  "database.user": "debezium",
+  "database.password": "deltasync-debezium",
+  "database.server.id": "5402",
+  "topic.prefix": "deltasync",
+  "database.include.list": "deltasync",
+  "table.include.list": "deltasync.orders,deltasync.customers",
+  "schema.history.internal.kafka.bootstrap.servers": "kafka:29092",
+  "schema.history.internal.kafka.topic": "_deltasync-schema-history",
+  "include.schema.changes": "false",
+  "snapshot.mode": "initial",
+  "snapshot.locking.mode": "minimal",
+  "decimal.handling.mode": "string",
+  "tombstones.on.delete": "false",
+  "provide.transaction.metadata": "true",
+  "topic.creation.default.replication.factor": "1",
+  "topic.creation.default.partitions": "1",
+  "topic.creation.default.cleanup.policy": "compact"
+}

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deltasync"
+version = "1.0.0"
+description = "CDC replication from MySQL to Delta Lake with exactly-once results"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+  "deltalake>=1.0,<2",
+  "pandas>=2.2,<3",
+  "pyarrow>=18,<22",
+  "streamlit>=1.44,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deltasync"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["deltasync"]
